@@ -1,0 +1,133 @@
+{% extends "base.html" %}
+{% block title %}Routes{% endblock %}
+
+{% block content %}
+    <div class="pt-8 flex justify-between items-center mb-8 max-w-6xl mx-auto px-4">
+        <h1 class="text-3xl font-bold">Cycling Routes</h1>
+        <a href="/upload" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Upload New Route</a>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4 flex gap-8 items-start">
+        <aside class="w-80 bg-white border border-gray-200 rounded-xl shadow p-6 sticky top-6 mt-6">
+            <h2 class="text-lg font-semibold mb-4 text-gray-700">Filter Routes</h2>
+            <form id="filter-form" autocomplete="off" class="flex flex-col gap-4">
+                <input type="text" name="search" id="search" placeholder="Search name or tags"
+                    value="{{ request.args.get('search', '') }}"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="number" name="min_distance" id="min_distance" placeholder="Min distance (km)" step="0.1"
+                    value="{{ request.args.get('min_distance', '') }}"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="number" name="max_distance" id="max_distance" placeholder="Max distance (km)" step="0.1"
+                    value="{{ request.args.get('max_distance', '') }}"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="number" name="min_elevation" id="min_elevation" placeholder="Min gain (m)"
+                    value="{{ request.args.get('min_elevation', '') }}"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <input type="number" name="max_elevation" id="max_elevation" placeholder="Max gain (m)"
+                    value="{{ request.args.get('max_elevation', '') }}"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+                <select name="start_location" id="start_location"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="">Any start location</option>
+                    <option value="Campus">Campus</option>
+                    <option value="Leamington">Leamington</option>
+                    <option value="Other">Other</option>
+                </select>
+                <a href="/" class="inline-block mt-2 text-blue-600 hover:underline text-sm">Reset</a>
+            </form>
+        </aside>
+
+        <section class="flex-1" id="routes-list">
+            {% for route in routes %}
+            <a href="{{ url_for('route', route_id=route.id) }}" class="block mb-6 group">
+                <div
+                    class="route-card flex bg-white border border-gray-200 rounded-xl shadow hover:shadow-lg transition p-6 gap-6"
+                    data-name="{{ route.name|lower }}"
+                    data-tags="{{ route.tags|lower }}"
+                    data-distance="{{ route.distance }}"
+                    data-elevation="{{ route.elevation_gain }}"
+                    data-start-location="{{ route.start_location|default('Unknown')|lower }}"
+                >
+                    <div class="route-info flex-1">
+                        <strong class="text-xl font-semibold group-hover:text-blue-700 transition">{{ route.name }}</strong><br />
+                        <span class="text-gray-600">{{ route.distance|round(2) }} km, {{ route.elevation_gain|round|int }} m gain</span><br />
+                        <p class="mt-2 text-gray-700">{{ route.description }}</p>
+                        <p class="mt-1 text-sm text-gray-500"><em>Tags:</em> {{ route.tags }}</p>
+                        <p class="mt-1 text-sm text-gray-500"><em>Start:</em> {{ route.start_location|default('Unknown') }}</p>
+                        <a href="/uploads/{{ route.gpx_file }}" onclick="event.stopPropagation();"
+                           class="inline-block mt-2 text-blue-600 hover:underline text-sm">Download GPX</a>
+                    </div>
+                    <div id="map-{{ route.id }}" class="small-map-container w-64 h-40 rounded-lg border border-gray-200"></div>
+                </div>
+            </a>
+            {% endfor %}
+        </section>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        // Mini-maps (unchanged)
+        const routes = [
+            {% for route in routes %}
+                { id: {{ route.id }}, gpx: "/uploads/{{ route.gpx_file }}" }{% if not loop.last %}, {% endif %}
+            {% endfor %}
+        ];
+
+        routes.forEach(route => {
+            const map = L.map("map-" + route.id, {
+                zoomControl: false,
+                attributionControl: false,
+            }).setView([51.505, -0.09], 13);
+
+            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+                maxZoom: 18,
+            }).addTo(map);
+
+            new L.GPX(route.gpx, {
+                async: true,
+                marker_options: {
+                    startIconUrl: null,
+                    endIconUrl: null,
+                    shadowUrl: null,
+                },
+            })
+                .on("loaded", function (e) {
+                    map.fitBounds(e.target.getBounds());
+                })
+                .addTo(map);
+        });
+
+        // Live filtering
+        function filterRoutes() {
+            const search = document.getElementById('search').value.trim().toLowerCase();
+            const minDist = parseFloat(document.getElementById('min_distance').value) || -Infinity;
+            const maxDist = parseFloat(document.getElementById('max_distance').value) || Infinity;
+            const minElev = parseFloat(document.getElementById('min_elevation').value) || -Infinity;
+            const maxElev = parseFloat(document.getElementById('max_elevation').value) || Infinity;
+            const startLoc = document.getElementById('start_location').value.trim().toLowerCase();
+
+            document.querySelectorAll('#routes-list .route-card').forEach(card => {
+                const name = (card.dataset.name || '').toLowerCase();
+                const tags = (card.dataset.tags || '').toLowerCase();
+                const distance = parseFloat(card.dataset.distance);
+                const elevValue = parseFloat(card.dataset.elevation);
+                const cardStartLoc = (card.dataset.startLocation || 'unknown').trim().toLowerCase();
+
+                let matches = true;
+                if (search && !(name.includes(search) || tags.includes(search))) matches = false;
+                if (distance < minDist || distance > maxDist) matches = false;
+                if (elevValue < minElev || elevValue > maxElev) matches = false;
+                if (startLoc && cardStartLoc !== startLoc) matches = false;
+
+                (card.closest('a') || card).style.display = matches ? '' : 'none';
+            });
+        }
+
+        ['search', 'min_distance', 'max_distance', 'min_elevation', 'max_elevation', 'start_location'].forEach(id => {
+            document.getElementById(id).addEventListener('input', filterRoutes);
+        });
+    });
+</script>
+{% endblock %}

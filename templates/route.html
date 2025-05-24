@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}{{ route.name }} - Route Details{% endblock %}
+
+{% block content %}
+<div class="max-w-4xl mx-auto mt-10">
+    <div class="flex justify-between items-start mb-6">
+        <h1 class="text-3xl font-bold">{{ route.name }}</h1>
+        <a href="javascript:history.back()" class="text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium ml-4">Back</a>
+    </div>
+    <div class="flex gap-8 items-start mb-8">
+        <table class="text-base border-collapse min-w-[140px]">
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">Length:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">{{ route.distance | round(2) }} km</td>
+            </tr>
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">Elevation Gain:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">{{ route.elevation_gain | round | int }} m</td>
+            </tr>
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">Difficulty:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">{{ route.difficulty }}</td>
+            </tr>
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">Start:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">{{ route.start_location|default('Unknown') }}</td>
+            </tr>
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">Tags:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">{{ route.tags }}</td>
+            </tr>
+            <tr>
+                <th class="pr-2 text-left font-normal text-gray-600 whitespace-nowrap">GPX:</th>
+                <td class="pl-2 text-left min-w-[60px] whitespace-nowrap">
+                    <a href="/uploads/{{ route.gpx_file }}" class="text-blue-600 hover:underline text-sm">Download</a>
+                </td>
+            </tr>
+        </table>
+        <div class="w-px bg-gray-200 h-32 mx-6"></div>
+        <div class="flex-1">
+            <p class="mt-1 text-gray-700">{{ route.description }}</p>
+        </div>
+    </div>
+    <div class="mb-8">
+        <div id="map-{{ route.id }}" class="w-full h-96 rounded-lg border border-gray-200"></div>
+        <div id="elevation-{{ route.id }}" class="w-full h-56 mt-6"></div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<!-- Leaflet core -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<!-- Raruto/leaflet-elevation plugin (correct CDN) -->
+<link rel="stylesheet" href="https://unpkg.com/@raruto/leaflet-elevation/dist/leaflet-elevation.css" />
+<script src="https://unpkg.com/@raruto/leaflet-elevation/dist/leaflet-elevation.js"></script>
+<!-- leaflet-gpx for GPX parsing -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Create the map
+    const map = L.map("map-{{ route.id }}").setView([51.505, -0.09], 13);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+
+    // Create the elevation control (Raruto/leaflet-elevation)
+    const elevation = L.control.elevation({
+        position: "bottomright",
+        theme: "lightblue-theme",
+        detached: true,
+        elevationDiv: "#elevation-{{ route.id }}",
+        collapsed: false,
+        autohide: false,
+        followMarker: false,
+        almostOver: false,
+        legend: false,
+        summary: 'inline',
+        imperial: false,
+        ruler: false,
+        hotline: 'slope',
+        waypoints: false,
+        preferCanvas: false,
+        closeBtn: false,
+        slope: false,
+        time: false,
+        edgeScale: true,
+    });
+    elevation.addTo(map);
+
+    // Load the GPX and add to map and elevation
+    const gpx = new L.GPX("/uploads/{{ route.gpx_file }}", {
+        async: true,
+        marker_options: {
+            startIconUrl: null,
+            endIconUrl: null,
+            shadowUrl: null,
+        },
+        polyline_options: {
+            color: 'blue',
+            opacity: 0.75,
+            weight: 3,
+            lineCap: 'round'
+        }
+    })
+    .on("loaded", function(e) {
+        map.fitBounds(e.target.getBounds());
+    })
+    .on("addline", function(e) {
+        elevation.addData(e.line);
+    })
+    .addTo(map);
+});
+</script>
+{% endblock %}
