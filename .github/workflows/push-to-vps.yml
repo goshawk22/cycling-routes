@@ -10,12 +10,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+
+      - name: Setup WARP
+        uses: fscarmen/warp-on-actions@v1.0
+
       - name: Checkout code
         uses: actions/checkout@v3
 
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.2.2
         with:
+          protocol: tcp6
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
