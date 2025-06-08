@@ -1,0 +1,6 @@
+[Unit]
+Description=Backup db
+
+[Service]
+Type=oneshot
+ExecStart=/bin/bash /home/debian/cycling-routes/scripts/backup.sh

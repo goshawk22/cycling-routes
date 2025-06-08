@@ -1,0 +1,9 @@
+[Unit]
+Description=Backup db timer
+
+[Timer]
+OnUnitActiveSec=8h
+OnBootSec=60s
+
+[Install]
+WantedBy=timers.target

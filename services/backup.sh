@@ -7,8 +7,8 @@ BACKUP_NAME="backup_$TIMESTAMP.zip"
 
 # Create a temporary directory for zipping
 TMPDIR=$(mktemp -d)
-cp -r uploads "$TMPDIR/"
-cp routes.db "$TMPDIR/"
+cp -r ../uploads "$TMPDIR/"
+cp ../routes.db "$TMPDIR/"
 
 # Zip the contents
 cd "$TMPDIR"
