@@ -24,17 +24,16 @@ def recalculate_elevation_with_srtm():
 
         with open(gpx_path, 'r') as gpx_file:
             gpx = gpxpy.parse(gpx_file)
-
+            elevation_gain = 0.0
             # Replace all point elevations with SRTM data
             for track in gpx.tracks:
                 for segment in track.segments:
-                    for point in segment.points:
+                    for i, point in enumerate(segment.points):
                         srtm_elev = elevation_data.get_elevation(point.latitude, point.longitude)
                         if srtm_elev is not None:
                             point.elevation = srtm_elev
 
             distance = sum([t.length_3d() for t in gpx.tracks])
-            elevation_gain = 0
             for track in gpx.tracks:
                 for segment in track.segments:
                     uphill, _ = segment.get_uphill_downhill()
