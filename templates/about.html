@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>About</title>
+</head>
+<body>
+  {% extends "base.html" %}
+  {% block title %}About{% endblock %}
+  {% block content %}
+  <div class="max-w-2xl mx-auto mt-10 bg-white border border-gray-200 rounded-xl shadow p-8 relative">
+    <a href="/" class="absolute top-4 right-4 text-blue-600 hover:underline text-sm font-semibold">← Back</a>
+    <h1 class="text-2xl font-bold mb-4">About</h1>
+    <p>The aim of this website is to provide a platform for members of WUCT to share and discover cycling routes.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Technical Information</h2>
+    <p>This site is built using Flask, a Python web framework. It uses a SQLite database to store route data. It's 
+        currently hosted on a STARDUST1-S VPS from Scaleway. It only has an IPV6 address so it uses a cloudflare tunnel to expose the site to the internet.
+        Backups are made every 8 hours using a systemd timer and service. The script zips the database file and GPX files and
+        uploads them to a Cloudflare R2 bucket.</p>
+    
+    <h2 class="text-xl font-semibold mt-6 mb-2">Source Code</h2>
+    <p>The source code for this site is available on GitHub: <a href="https://github.com/goshawk22/cycling-routes" class="text-blue-600 hover:underline">https://github.com/goshawk22/cycling-routes</a></p>
+    <p>Feel free to contribute or report issues. Contributions are welcome!</p>
+  </div>
+  {% endblock %}
+</body>
+</html>

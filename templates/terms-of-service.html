@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Terms of Service</title>
+</head>
+<body>
+  {% extends "base.html" %}
+  {% block title %}Terms of Service{% endblock %}
+  {% block content %}
+  <div class="max-w-2xl mx-auto mt-10 bg-white border border-gray-200 rounded-xl shadow p-8 relative">
+    <a href="/" class="absolute top-4 right-4 text-blue-600 hover:underline text-sm font-semibold">← Back</a>
+    <h1 class="text-2xl font-bold mb-4">Terms of Service</h1>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">1. Use of the Site</h2>
+    <ul class="list-disc pl-6 mb-4">
+      <li>You may use this site to view and submit cycling routes.</li>
+      <li>You must not submit harmful, illegal, or misleading content.</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">2. Content Ownership</h2>
+    <ul class="list-disc pl-6 mb-4">
+      <li>By submitting a route, you grant us the right to display and share it on this site.</li>
+      <li>You confirm you have the right to share any content you upload.</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">3. Disclaimer</h2>
+    <p class="mb-4">Route information is user-submitted and may not be accurate or up-to-date. Always verify conditions before attempting any route. Use at your own risk.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">4. Liability</h2>
+    <p class="mb-4">We are not liable for any injury, loss, or damage resulting from use of the site or the routes displayed.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">5. Changes</h2>
+    <p class="mb-4">We reserve the right to change or remove content, or update these terms, at any time.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Contact</h2>
+    <p class="mb-4">For questions or concerns, contact <a href="mailto:dev@goshawk22.uk" class="text-blue-600 hover:underline">dev@goshawk22.uk</a>.</p>
+  </div>
+  {% endblock %}
+</body>
+</html>

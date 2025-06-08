@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Privacy Policy</title>
+</head>
+<body>
+  {% extends "base.html" %}
+  {% block title %}Privacy Policy{% endblock %}
+  {% block content %}
+  <div class="max-w-2xl mx-auto mt-10 bg-white border border-gray-200 rounded-xl shadow p-8 relative">
+    <a href="/" class="absolute top-4 right-4 text-blue-600 hover:underline text-sm font-semibold">← Back</a>
+    <h1 class="text-2xl font-bold mb-4">Privacy Policy</h1>
+    <p>This website is dedicated to sharing user-submitted cycling routes. We respect your privacy and aim to collect as little information as necessary.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Data Collection</h2>
+    <ul class="list-disc pl-6 mb-4">
+      <li>When users submit routes, we collect the route data itself (e.g., text, GPS coordinates, descriptions).</li>
+      <li>No personal identifying information is collected or required.</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Cookies</h2>
+    <p class="mb-4">We may use essential cookies to ensure the site works correctly. We do not use third-party tracking or analytics cookies.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Data Usage</h2>
+    <ul class="list-disc pl-6 mb-4">
+      <li>Submitted routes may be displayed publicly on the website.</li>
+      <li>We do not share, sell, or otherwise distribute route data to third parties.</li>
+    </ul>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">External Links</h2>
+    <p class="mb-4">The site may contain links to third-party websites. We are not responsible for their privacy practices.</p>
+
+    <h2 class="text-xl font-semibold mt-6 mb-2">Contact</h2>
+    <p class="mb-4">If you have questions about this policy, contact us at <a href="mailto:dev@goshawk22.uk" class="text-blue-600 hover:underline">dev@goshawk22.uk</a>.</p>
+
+    <p class="text-gray-500 text-sm">This policy may be updated from time to time. Continued use of the site constitutes your acceptance of any changes.</p>
+  </div>
+  {% endblock %}
+</body>
+</html>

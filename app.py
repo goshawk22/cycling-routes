@@ -219,5 +219,17 @@ def handle_file_too_large(e):
     flash("File is too large (max 5MB).")
     return render_template('upload.html'), 413
 
+@app.route('/privacy-policy')
+def privacy_policy():
+    return render_template('privacy-policy.html')
+
+@app.route('/terms-of-service')
+def terms_of_service():
+    return render_template('terms-of-service.html')
+
+@app.route('/about')
+def about():
+    return render_template('about.html')
+
 if __name__ == '__main__':
     app.run(debug=True)
