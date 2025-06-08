@@ -2,17 +2,24 @@
 
 set -e
 
-if [ -z "$1" ]; then
-    echo "Usage: $0 <destination_folder>"
-    exit 1
-fi
-
-DEST="$1"
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
-BACKUP_DIR="$DEST/$TIMESTAMP"
+BACKUP_NAME="backup_$TIMESTAMP.zip"
 
-mkdir -p "$BACKUP_DIR"
-cp -r uploads "$BACKUP_DIR/"
-cp routes.db "$BACKUP_DIR/"
+# Create a temporary directory for zipping
+TMPDIR=$(mktemp -d)
+cp -r uploads "$TMPDIR/"
+cp routes.db "$TMPDIR/"
 
-echo "Backup completed: $BACKUP_DIR"
+# Zip the contents
+cd "$TMPDIR"
+zip -r "$BACKUP_NAME" uploads routes.db
+cd -
+
+# Upload to Cloudflare R2 (S3-compatible)
+# Requires AWS CLI configured for your R2 bucket
+aws s3 cp "$TMPDIR/$BACKUP_NAME" s3://cycling-backups/backups/ --endpoint-url https://e309406756ae8f307fcafce3a31c6a88.r2.cloudflarestorage.com
+
+echo "Backup completed and uploaded: $TMPDIR/$BACKUP_NAME"
+
+# Cleanup
+rm -rf "$TMPDIR"
