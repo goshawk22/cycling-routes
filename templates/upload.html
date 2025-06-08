@@ -52,5 +52,17 @@
     <a href="/" class="inline-block mt-6 text-blue-600 hover:underline text-sm">← Back to route list</a>
   </div>
   {% endblock %}
+
+  {% block scripts %}
+  <script>
+  document.querySelector('form').addEventListener('submit', function(e) {
+      const fileInput = document.getElementById('gpx_file');
+      if (fileInput.files.length && fileInput.files[0].size > 5 * 1024 * 1024) {
+          alert("File is too large (max 5MB).");
+          e.preventDefault();
+      }
+  });
+  </script>
+  {% endblock %}
 </body>
 </html>
