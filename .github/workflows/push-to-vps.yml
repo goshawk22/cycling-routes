@@ -27,8 +27,8 @@ jobs:
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
           script: |
-            cd /home/debian/cycling-web/cycling-website
+            cd /home/debian/cycling-routes
             git pull origin master
-            source ../venv/bin/activate
+            source venv/bin/activate
             pip install -r requirements.txt
-            sudo systemctl restart cycling-app
+            sudo systemctl restart cycling-routes.service

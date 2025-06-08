@@ -1,0 +1,17 @@
+[Unit]
+Description=Gunicorn instance to serve application
+After=network.target
+
+[Service]
+User=debian
+Group=debian
+WorkingDirectory=/home/debian/cycling-routes
+Environment="PATH=/home/debian/cycling-routes/venv/bin"
+ExecStart=/home/debian/cycling-routes/venv/bin/gunicorn --bind 0.0.0.0:8000 app:app
+ExecReload=/bin/kill -s HUP $MAINPID
+KillMode=mixed
+TimeoutStopSec=5
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
