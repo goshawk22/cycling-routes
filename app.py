@@ -24,7 +24,9 @@ def init_db():
             tags TEXT,
             gpx_file TEXT,
             distance REAL,
-            elevation_gain REAL
+            elevation_gain REAL,
+            start_location TEXT,
+            difficulty TEXT
         )''')
 init_db()
 
@@ -123,8 +125,8 @@ def upload():
         # Insert a dummy row to get the next id
         with sqlite3.connect('routes.db') as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                      (name, description, tags, '', 0, 0, ''))
+            c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                      (name, description, tags, '', 0, 0, '', ''))
             route_id = c.lastrowid
 
         unique_filename = f"{route_id}-{safe_name}{ext}"
@@ -175,10 +177,35 @@ def upload():
         else:
             start_location = "Unknown"
 
-        # Update the row with the real filename and stats
+        # --- Difficulty rating logic ---
+        # distance in km, elevation_gain in m
+        difficulty = ""
+        dist_km = distance / 1000
+        elev_m = elevation_gain
+
+        if dist_km < 30 and elev_m < 300:
+            difficulty = "Easy"
+        elif 30 <= dist_km <= 70 and 300 <= elev_m <= 1000:
+            difficulty = "Moderate"
+        elif 70 < dist_km <= 100 and 1000 < elev_m <= 2000:
+            difficulty = "Hard"
+        elif dist_km > 100 and elev_m > 2000:
+            difficulty = "Very Hard"
+        else:
+            # If it doesn't fit exactly, pick the highest matching category
+            if dist_km > 100 or elev_m > 2000:
+                difficulty = "Very Hard"
+            elif dist_km > 70 or elev_m > 1000:
+                difficulty = "Hard"
+            elif dist_km > 30 or elev_m > 300:
+                difficulty = "Moderate"
+            else:
+                difficulty = "Easy"
+
+        # Update the row with the real filename, stats, and difficulty
         with sqlite3.connect('routes.db') as conn:
-            conn.execute('UPDATE routes SET gpx_file=?, distance=?, elevation_gain=?, start_location=? WHERE id=?',
-                         (unique_filename, distance / 1000, elevation_gain, start_location, route_id))
+            conn.execute('UPDATE routes SET gpx_file=?, distance=?, elevation_gain=?, start_location=?, difficulty=? WHERE id=?',
+                         (unique_filename, dist_km, elevation_gain, start_location, difficulty, route_id))
 
         return redirect('/')
     return render_template('upload.html')
