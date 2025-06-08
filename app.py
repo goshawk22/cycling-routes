@@ -1,12 +1,15 @@
-from flask import Flask, render_template, request, redirect, send_from_directory
+from flask import Flask, render_template, request, redirect, send_from_directory, flash
+from werkzeug.exceptions import RequestEntityTooLarge
 import os
 import sqlite3
 import gpxpy
 import srtm
 import math
+import secrets
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max upload size
+app.secret_key = secrets.token_hex(32)  # Generate a random secret key at startup
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
@@ -100,6 +103,20 @@ def upload():
         description = request.form['description']
         tags = request.form['tags']
 
+        # Check file size (already enforced by Flask, but for user-friendly error)
+        file.seek(0, os.SEEK_END)
+        file_length = file.tell()
+        file.seek(0)
+        if file_length > 5 * 1024 * 1024:
+            flash("File is too large (max 5MB).")
+            return render_template('upload.html')
+
+        # Check file extension
+        ext = os.path.splitext(file.filename)[1].lower()
+        if ext != '.gpx':
+            flash("Only GPX files are allowed.")
+            return render_template('upload.html')
+
         import re
         safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name.strip())[:40]
 
@@ -110,7 +127,6 @@ def upload():
                       (name, description, tags, '', 0, 0, ''))
             route_id = c.lastrowid
 
-        ext = os.path.splitext(file.filename)[1] or '.gpx'
         unique_filename = f"{route_id}-{safe_name}{ext}"
         filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
         file.save(filepath)
@@ -170,6 +186,11 @@ def upload():
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(UPLOAD_FOLDER, filename)
+
+@app.errorhandler(RequestEntityTooLarge)
+def handle_file_too_large(e):
+    flash("File is too large (max 5MB).")
+    return render_template('upload.html'), 413
 
 if __name__ == '__main__':
     app.run(debug=True)
