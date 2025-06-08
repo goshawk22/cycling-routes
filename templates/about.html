@@ -15,8 +15,10 @@
     <p>The aim of this website is to provide a platform for members of WUCT to share and discover cycling routes.</p>
 
     <h2 class="text-xl font-semibold mt-6 mb-2">Technical Information</h2>
-    <p>This site is built using Flask, a Python web framework. It uses a SQLite database to store route data. It's 
-        currently hosted on a STARDUST1-S VPS from Scaleway. It only has an IPV6 address so it uses a cloudflare tunnel to expose the site to the internet.
+    <p>This site is built using Flask, a Python web framework. It uses a SQLite database to store route data. For maps, it uses Leaflet.js
+         to display GPX files. Currently it uses my own fork of leaflet-elevation for elevation profiles that fixes some bugs upstream.</p>
+        
+    <p>It's currently hosted on a STARDUST1-S VPS from Scaleway. It only has an IPV6 address so it uses a cloudflare tunnel to expose the site to the internet.
         Backups are made every 8 hours using a systemd timer and service. The script zips the database file and GPX files and
         uploads them to a Cloudflare R2 bucket.</p>
     
