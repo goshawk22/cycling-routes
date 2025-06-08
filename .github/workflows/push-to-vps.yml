@@ -16,7 +16,6 @@ jobs:
       - name: SSH & Deploy
         uses: appleboy/ssh-action@v1.2.2
         with:
-          protocol: tcp6
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SSH_USER }}
           key: ${{ secrets.SSH_KEY }}
