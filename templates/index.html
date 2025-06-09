@@ -42,6 +42,12 @@
                     <option value="Hard">Hard</option>
                     <option value="Extreme">Extreme</option>
                 </select>
+                <!-- Offroad filter -->
+                <select name="offroad" id="offroad"
+                    class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
+                    <option value="0" selected>Road</option>
+                    <option value="1">Offroad</option>
+                </select>
                 <a href="/" class="inline-block mt-2 text-blue-600 hover:underline text-sm">Reset</a>
             </form>
         </aside>
@@ -57,6 +63,7 @@
                     data-elevation="{{ route.elevation_gain }}"
                     data-start-location="{{ route.start_location|default('Unknown')|lower }}"
                     data-difficulty="{{ route.difficulty|default('')|lower }}"
+                    data-offroad="{{ route.offroad|default(0) }}"
                 >
                     <div class="route-info flex-1">
                         <strong class="text-xl font-semibold group-hover:text-blue-700 transition">{{ route.name }}</strong><br />
@@ -126,6 +133,7 @@
             const maxElev = parseFloat(document.getElementById('max_elevation').value) || Infinity;
             const startLoc = document.getElementById('start_location').value.trim().toLowerCase();
             const difficulty = document.getElementById('difficulty').value.trim().toLowerCase();
+            const offroad = document.getElementById('offroad').value;
 
             document.querySelectorAll('#routes-list .route-card').forEach(card => {
                 const name = (card.dataset.name || '').toLowerCase();
@@ -134,6 +142,7 @@
                 const elevValue = parseFloat(card.dataset.elevation);
                 const cardStartLoc = (card.dataset.startLocation || 'unknown').trim().toLowerCase();
                 const cardDifficulty = (card.dataset.difficulty || '').trim().toLowerCase();
+                const cardOffroad = card.dataset.offroad || "0";
 
                 let matches = true;
                 if (search && !(name.includes(search) || tags.includes(search))) matches = false;
@@ -141,12 +150,16 @@
                 if (elevValue < minElev || elevValue > maxElev) matches = false;
                 if (startLoc && cardStartLoc !== startLoc) matches = false;
                 if (difficulty && cardDifficulty !== difficulty) matches = false;
+                if (offroad !== "" && cardOffroad !== offroad) matches = false;
 
                 (card.closest('a') || card).style.display = matches ? '' : 'none';
             });
         }
 
-        ['search', 'min_distance', 'max_distance', 'min_elevation', 'max_elevation', 'start_location', 'difficulty'].forEach(id => {
+        // Apply defaults at the start
+        filterRoutes();
+
+        ['search', 'min_distance', 'max_distance', 'min_elevation', 'max_elevation', 'start_location', 'difficulty', 'offroad'].forEach(id => {
             document.getElementById(id).addEventListener('input', filterRoutes);
         });
     });

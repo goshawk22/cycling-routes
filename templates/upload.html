@@ -41,6 +41,11 @@
         <input type="text" name="tags" id="tags" placeholder="e.g. gravel, loop, scenic"
           class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
       </div>
+      <div class="flex items-center gap-2">
+        <input type="checkbox" name="offroad" id="offroad" value="1"
+          class="rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+        <label for="offroad" class="font-medium">This route includes offroad sections</label>
+      </div>
       <div>
         <label for="gpx_file" class="block font-medium mb-1">GPX File</label>
         <input type="file" name="gpx_file" id="gpx_file" accept=".gpx" required

@@ -26,7 +26,8 @@ def init_db():
             distance REAL,
             elevation_gain REAL,
             start_location TEXT,
-            difficulty TEXT
+            difficulty TEXT,
+            offroad INTEGER DEFAULT 0
         )''')
 init_db()
 
@@ -69,7 +70,8 @@ def index():
     min_elev = request.args.get('min_elevation')
     max_elev = request.args.get('max_elevation')
     start_loc = request.args.get('start_location')
-
+    offroad = request.args.get('offroad')
+ 
     query = "SELECT * FROM routes WHERE 1=1"
     params = []
 
@@ -104,6 +106,7 @@ def upload():
         name = request.form['name']
         description = request.form['description']
         tags = request.form['tags']
+        offroad = int(request.form.get('offroad', '0'))
 
         # Check file size (already enforced by Flask, but for user-friendly error)
         file.seek(0, os.SEEK_END)
@@ -125,8 +128,8 @@ def upload():
         # Insert a dummy row to get the next id
         with sqlite3.connect('routes.db') as conn:
             c = conn.cursor()
-            c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
-                      (name, description, tags, '', 0, 0, '', ''))
+            c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location, difficulty, offroad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                      (name, description, tags, '', 0, 0, '', '', offroad))
             route_id = c.lastrowid
 
         unique_filename = f"{route_id}-{safe_name}{ext}"
