@@ -67,6 +67,81 @@ document.addEventListener("DOMContentLoaded", function () {
     const map = L.map("map-{{ route.id }}").setView([51.505, -0.09], 13);
     L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
 
+    // Helper: is offroad
+    function isOffroad(surface) {
+        switch ((surface || '').toLowerCase()) {
+            case 'asphalt':
+            case 'concrete':
+            case 'tarmac':
+            case 'paved':
+                return false;
+            default:
+                return true;
+        }
+    }
+
+    fetch("/uploads/{{ route.gpx_file }}")
+        .then(res => res.text())
+        .then(gpxText => {
+            const parser = new DOMParser();
+            const xml = parser.parseFromString(gpxText, "application/xml");
+            const trksegs = xml.querySelectorAll("trkseg");
+            let bounds = [];
+
+            trksegs.forEach(seg => {
+                let lastSurface = null;
+                let latlngs = [];
+                seg.querySelectorAll("trkpt").forEach(pt => {
+                    const lat = parseFloat(pt.getAttribute("lat"));
+                    const lon = parseFloat(pt.getAttribute("lon"));
+                    // Try to get surface type from <extensions>
+                    let surface = null;
+                    const ext = pt.querySelector("extensions");
+                    if (ext) {
+                        const surf = ext.querySelector("surface");
+                        if (surf) surface = surf.textContent;
+                    }
+                    // If surface changes, draw previous segment
+                    if (latlngs.length > 0 && surface !== lastSurface) {
+                        drawStyledLine(latlngs, isOffroad(lastSurface));
+                        latlngs = [];
+                    }
+                    latlngs.push([lat, lon]);
+                    bounds.push([lat, lon]);
+                    lastSurface = surface;
+                });
+                // Draw last segment
+                if (latlngs.length > 1) {
+                    drawStyledLine(latlngs, isOffroad(lastSurface));
+                }
+            });
+
+            if (bounds.length > 0) {
+                map.fitBounds(bounds);
+            }
+        });
+
+    // Draws a Strava-style line: blue base, white dashed overlay for offroad
+    function drawStyledLine(latlngs, offroad) {
+        // Main blue line
+        L.polyline(latlngs, {
+            color: '#3388ff',
+            weight: 7,
+            opacity: 0.9,
+            lineCap: 'round'
+        }).addTo(map);
+        // White dashed overlay for offroad
+        if (offroad) {
+            L.polyline(latlngs, {
+                color: '#fff',
+                weight: 3,
+                opacity: 0.9,
+                dashArray: '3, 5',
+                lineCap: 'round'
+            }).addTo(map);
+        }
+    }
+
     // Create the elevation control (Raruto/leaflet-elevation)
     const elevation = L.control.elevation({
         position: "bottomright",
@@ -90,12 +165,12 @@ document.addEventListener("DOMContentLoaded", function () {
         time: false,
         edgeScale: true,
         linearGradient: true,
-		handlers: [
-			'Altitude',      // same as: import('../src/handlers/altitude.js')
-			'Distance',      // same as: import('../src/handlers/distance.js')
-			'Slope',         // same as: import('../src/handlers/slope.js')
-			'LinearGradient' // same as: import('../src/handlers/lineargradient.js')
-		],
+        handlers: [
+            'Altitude',
+            'Distance',
+            'Slope',
+            'LinearGradient'
+        ],
     });
     elevation.addTo(map);
 
