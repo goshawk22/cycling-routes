@@ -75,7 +75,13 @@
                             {% elif route.difficulty == 'Extreme' %}bg-red-100 text-red-800
                             {% else %}bg-gray-100 text-gray-800{% endif %}">
                             {{ route.difficulty|default('Unknown') }}
-                        </span><br />
+                        </span>
+                        {% if route.offroad %}
+                        <span class="ml-2 px-2 py-1 rounded text-xs font-semibold bg-amber-100 text-amber-800 border border-amber-300">
+                            Offroad
+                        </span>
+                        {% endif %}
+                        <br />
                         <p class="mt-2 text-gray-700">{{ route.description }}</p>
                         <p class="mt-1 text-sm text-gray-500"><em>Tags:</em> {{ route.tags }}</p>
                         <p class="mt-1 text-sm text-gray-500"><em>Start:</em> {{ route.start_location|default('Unknown') }}</p>
