@@ -2,3 +2,4 @@ Flask
 gpxpy
 srtm.py
 gunicorn
+Flask-Compress

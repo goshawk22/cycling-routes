@@ -11,6 +11,13 @@ app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max upload size
 app.secret_key = secrets.token_hex(32)  # Generate a random secret key at startup
 
+from flask_compress import Compress
+
+# This below command enables Gzip compression for the Flask app
+# It compresses responses before sending them to clients,
+# reducing data transfer and improving performance
+Compress(app)
+
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
