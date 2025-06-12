@@ -62,39 +62,7 @@ def index():
     conn = sqlite3.connect('routes.db')
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
-
-    # Get filter parameters from query string
-    search = request.args.get('search', '').strip()
-    min_dist = request.args.get('min_distance')
-    max_dist = request.args.get('max_distance')
-    min_elev = request.args.get('min_elevation')
-    max_elev = request.args.get('max_elevation')
-    start_loc = request.args.get('start_location')
-    offroad = request.args.get('offroad')
- 
-    query = "SELECT * FROM routes WHERE 1=1"
-    params = []
-
-    if search:
-        query += " AND (name LIKE ? OR tags LIKE ?)"
-        params += [f'%{search}%', f'%{search}%']
-    if min_dist:
-        query += " AND distance >= ?"
-        params.append(float(min_dist))
-    if max_dist:
-        query += " AND distance <= ?"
-        params.append(float(max_dist))
-    if min_elev:
-        query += " AND elevation >= ?"
-        params.append(float(min_elev))
-    if max_elev:
-        query += " AND elevation <= ?"
-        params.append(float(max_elev))
-    if start_loc:
-        query += " AND start_location = ?"
-        params.append(start_loc)
-
-    c.execute(query, params)
+    c.execute("SELECT * FROM routes")
     routes = c.fetchall()
     conn.close()
     return render_template('index.html', routes=routes, request=request)
