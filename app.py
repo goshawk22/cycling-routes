@@ -6,6 +6,7 @@ import gpxpy
 import srtm
 import math
 import secrets
+from staticmap import StaticMap, Line
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 5 * 1024 * 1024  # 5 MB max upload size
@@ -180,7 +181,27 @@ def upload():
             else:
                 difficulty = "Easy"
 
-        # Update the row with the real filename, stats, and difficulty
+        # --- Generate static map image with GPX overlay ---
+        try:
+            coords = []
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for point in segment.points:
+                        coords.append((point.longitude, point.latitude))
+            if coords:
+                m = StaticMap(400, 300)
+                m.add_line(Line(coords, 'blue', 3))
+                image = m.render()
+                static_img_filename = f"{route_id}-{safe_name}.png"
+                static_img_path = os.path.join(UPLOAD_FOLDER, static_img_filename)
+                image.save(static_img_path)
+            else:
+                static_img_filename = ""
+        except Exception as e:
+            print("Static map generation failed:", e)
+            static_img_filename = ""
+
+        # Update the row with the real filename, stats, and difficulty, and static image
         with sqlite3.connect('routes.db') as conn:
             conn.execute('UPDATE routes SET gpx_file=?, distance=?, elevation_gain=?, start_location=?, difficulty=? WHERE id=?',
                          (unique_filename, dist_km, elevation_gain, start_location, difficulty, route_id))

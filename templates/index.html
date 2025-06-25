@@ -88,7 +88,12 @@
                         <a href="/uploads/{{ route.gpx_file }}" onclick="event.stopPropagation();"
                            class="inline-block mt-2 text-blue-600 hover:underline text-sm">Download GPX</a>
                     </div>
-                    <div id="map-{{ route.id }}" class="small-map-container w-64 h-40 rounded-lg border border-gray-200"></div>
+                    <div class="small-map-container w-64 h-40 rounded-lg border border-gray-200 flex items-center justify-center bg-gray-100">
+                        <img src="{{ url_for('uploaded_file', filename=route.gpx_file.replace('.gpx', '.png')) }}"
+                             alt="Route map"
+                             class="w-full h-full object-cover rounded-lg border border-gray-200" />
+
+                    </div>
                 </div>
             </a>
             {% endfor %}
@@ -98,39 +103,9 @@
 
 {% block scripts %}
 <script>
+    // No mini-maps needed for the index page now!
+    // Live filtering
     document.addEventListener("DOMContentLoaded", function () {
-        // Mini-maps (unchanged)
-        const routes = [
-            {% for route in routes %}
-                { id: {{ route.id }}, gpx: "/uploads/{{ route.gpx_file }}" }{% if not loop.last %}, {% endif %}
-            {% endfor %}
-        ];
-
-        routes.forEach(route => {
-            const map = L.map("map-" + route.id, {
-                zoomControl: false,
-                attributionControl: false,
-            }).setView([51.505, -0.09], 13);
-
-            L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-                maxZoom: 18,
-            }).addTo(map);
-
-            new L.GPX(route.gpx, {
-                async: true,
-                marker_options: {
-                    startIconUrl: null,
-                    endIconUrl: null,
-                    shadowUrl: null,
-                },
-            })
-                .on("loaded", function (e) {
-                    map.fitBounds(e.target.getBounds());
-                })
-                .addTo(map);
-        });
-
-        // Live filtering
         function filterRoutes() {
             const search = document.getElementById('search').value.trim().toLowerCase();
             const minDist = parseFloat(document.getElementById('min_distance').value) || -Infinity;

@@ -3,3 +3,4 @@ gpxpy
 srtm.py
 gunicorn
 Flask-Compress
+staticmap
