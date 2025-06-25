@@ -192,9 +192,11 @@ def upload():
                 m = StaticMap(400, 300)
                 m.add_line(Line(coords, 'blue', 3))
                 image = m.render()
-                static_img_filename = f"{route_id}-{safe_name}.png"
+                static_img_filename = f"{route_id}-{safe_name}.webp"
                 static_img_path = os.path.join(UPLOAD_FOLDER, static_img_filename)
-                image.save(static_img_path)
+                # Convert to WebP and optimize
+                image = image.convert("RGB")  # Ensure compatibility with WebP
+                image.save(static_img_path, format="WEBP", quality=80, method=6)
             else:
                 static_img_filename = ""
         except Exception as e:
