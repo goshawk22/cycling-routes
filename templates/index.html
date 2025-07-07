@@ -1,6 +1,16 @@
 {% extends "base.html" %}
 {% block title %}Routes{% endblock %}
 
+{% block head %}
+    {{ super() }}
+    <!-- Prefetch Leaflet and elevation plugin CSS/JS -->
+    <link rel="prefetch" href="https://unpkg.com/leaflet/dist/leaflet.css" as="style">
+    <link rel="prefetch" href="https://unpkg.com/leaflet/dist/leaflet.js" as="script">
+    <link rel="prefetch" href="https://unpkg.com/@goshawk22/leaflet-elevation@2.5.3/dist/leaflet-elevation.css" as="style">
+    <link rel="prefetch" href="https://unpkg.com/@goshawk22/leaflet-elevation@2.5.3/dist/leaflet-elevation.js" as="script">
+    <link rel="prefetch" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js" as="script">
+{% endblock %}
+
 {% block content %}
     <div class="pt-8 flex justify-between items-center mb-8 max-w-6xl mx-auto px-4">
         <h1 class="text-3xl font-bold">Cycling Routes</h1>
