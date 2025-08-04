@@ -1,0 +1,151 @@
+{% extends "base.html" %}
+{% block title %}Cafes{% endblock %}
+
+{% block content %}
+    <div class="pt-8 flex justify-between items-center mb-8 max-w-6xl mx-auto px-4">
+        <h1 class="text-3xl font-bold">Cycling Cafes</h1>
+        <div class="flex gap-4">
+            <a href="/cafe/add" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Add New Cafe</a>
+            <a href="/" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Back to Routes</a>
+        </div>
+    </div>
+
+    <div class="max-w-6xl mx-auto px-4">
+        <!-- Flash messages -->
+        {% with messages = get_flashed_messages() %}
+          {% if messages %}
+            <div class="mb-6">
+              {% for message in messages %}
+                <div class="bg-green-100 border border-green-300 text-green-700 px-4 py-2 rounded mb-2">
+                  {{ message }}
+                </div>
+              {% endfor %}
+            </div>
+          {% endif %}
+        {% endwith %}
+        
+        <!-- Map showing all cafes -->
+        <div class="mb-8">
+            <h2 class="text-xl font-semibold mb-4">Cafe Locations</h2>
+            <div id="cafes-map" class="w-full h-96 rounded-lg border border-gray-200 relative">
+                <div id="map-loading" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+                    <div class="text-center">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                        <p class="text-gray-600">Loading map...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Cafe list -->
+        <div class="space-y-6">
+            <h2 class="text-xl font-semibold">All Cafes ({{ cafes|length }})</h2>
+            {% if cafes %}
+                {% for cafe in cafes %}
+                <div class="bg-white border border-gray-200 rounded-xl shadow p-6">
+                    <div class="flex justify-between items-start">
+                        <div class="flex-1">
+                            <h3 class="text-lg font-semibold">{{ cafe.name }}</h3>
+                            {% if cafe.description %}
+                                <p class="text-gray-700 mt-2">{{ cafe.description }}</p>
+                            {% endif %}
+                            <div class="mt-3 space-y-1 text-sm text-gray-600">
+                                <p><span class="font-medium">Location:</span> {{ "%.4f"|format(cafe.latitude) }}, {{ "%.4f"|format(cafe.longitude) }}</p>
+                                {% if cafe.opening_hours %}
+                                    <p><span class="font-medium">Hours:</span> {{ cafe.opening_hours }}</p>
+                                {% endif %}
+                                {% if cafe.website %}
+                                    <p><span class="font-medium">Website:</span> <a href="{{ cafe.website }}" target="_blank" class="text-blue-600 hover:underline">{{ cafe.website }}</a></p>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button onclick="focusOnCafe({{ cafe.latitude }}, {{ cafe.longitude }})" 
+                                    class="text-blue-600 hover:text-blue-800 text-sm font-medium">
+                                Show on Map
+                            </button>
+                            <a href="/cafe/edit/{{ cafe.id }}" 
+                               class="text-green-600 hover:text-green-800 text-sm font-medium">
+                                Edit
+                            </a>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            {% else %}
+                <div class="text-center py-12 bg-white border border-gray-200 rounded-xl">
+                    <p class="text-gray-500 text-lg">No cafes have been added yet.</p>
+                    <a href="/cafe/add" class="inline-block mt-4 text-blue-600 hover:underline">Add the first cafe</a>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    // Ensure Leaflet is loaded before proceeding
+    if (typeof L === 'undefined') {
+        console.error('Leaflet is not loaded');
+        return;
+    }
+
+    const mapLoading = document.getElementById('map-loading');
+    
+    // Create the map
+    const map = L.map('cafes-map', {
+        preferCanvas: true,
+        zoomControl: true,
+        attributionControl: true
+    }).setView([52.3813, -1.5616], 11); // Center on Warwick area
+
+    // Add tile layer
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { 
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Hide loading indicator once map is ready
+    map.whenReady(function() {
+        mapLoading.style.display = 'none';
+    });
+
+    // Add cafe markers
+    const cafes = {{ cafes|tojson }};
+    const markers = [];
+    
+    cafes.forEach(function(cafe) {
+        const marker = L.marker([cafe.latitude, cafe.longitude])
+            .bindPopup(`
+                <div class="p-2">
+                    <h4 class="font-semibold">${cafe.name}</h4>
+                    ${cafe.description ? `<p class="text-sm text-gray-600 mt-1">${cafe.description}</p>` : ''}
+                    ${cafe.opening_hours ? `<p class="text-xs text-gray-500 mt-1"><strong>Hours:</strong> ${cafe.opening_hours}</p>` : ''}
+                    ${cafe.website ? `<p class="text-xs mt-1"><a href="${cafe.website}" target="_blank" class="text-blue-600 hover:underline">Visit Website</a></p>` : ''}
+                </div>
+            `)
+            .addTo(map);
+        markers.push(marker);
+    });
+
+    // Fit map to show all cafes if any exist
+    if (markers.length > 0) {
+        const group = new L.featureGroup(markers);
+        map.fitBounds(group.getBounds().pad(0.1));
+    }
+
+    // Global function to focus on a specific cafe
+    window.focusOnCafe = function(lat, lng) {
+        map.setView([lat, lng], 16);
+        // Find and open the popup for this cafe
+        markers.forEach(marker => {
+            const markerPos = marker.getLatLng();
+            if (Math.abs(markerPos.lat - lat) < 0.0001 && Math.abs(markerPos.lng - lng) < 0.0001) {
+                marker.openPopup();
+            }
+        });
+    };
+});
+</script>
+{% endblock %}

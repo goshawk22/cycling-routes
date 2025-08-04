@@ -1,11 +1,61 @@
 {% extends "base.html" %}
 {% block title %}{{ route.name }} - Route Details{% endblock %}
 
+{% block head %}
+{{ super() }}
+<style>
+    /* Ensure elevation profile doesn't overlap with content below */
+    .elevation-container {
+        margin-bottom: 60px !important;
+        overflow: visible;
+        min-height: 280px;
+    }
+    
+    /* Force cafes section to appear below elevation */
+    .cafes-section {
+        clear: both;
+        position: relative;
+        z-index: 1;
+        margin-top: 40px !important;
+        padding-top: 20px !important;
+    }
+    
+    /* Ensure leaflet elevation control doesn't overflow */
+    .leaflet-control-elevation {
+        position: relative !important;
+        margin-bottom: 20px !important;
+    }
+    
+    /* Add a clear separator */
+    .section-separator {
+        height: 30px;
+        clear: both;
+        overflow: hidden;
+    }
+</style>
+{% endblock %}
+
 {% block content %}
 <div class="max-w-4xl mx-auto mt-10">
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="mb-6">
+          {% for message in messages %}
+            <div class="bg-green-100 border border-green-300 text-green-700 px-4 py-2 rounded mb-2">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+    
     <div class="flex justify-between items-start mb-6">
         <h1 class="text-3xl font-bold">{{ route.name }}</h1>
-        <a href="javascript:history.back()" class="text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium ml-4">Back</a>
+        <div class="flex gap-3">
+            <a href="/route/edit/{{ route.id }}" class="text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Edit Route</a>
+            <a href="/" class="text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Back to Routes</a>
+        </div>
     </div>
     <div class="flex gap-8 items-start mb-8">
         <table class="text-base border-collapse min-w-[140px]">
@@ -50,7 +100,7 @@
                 </div>
             </div>
         </div>
-        <div id="elevation-{{ route.id }}" class="w-full h-56 mt-6 relative">
+        <div id="elevation-{{ route.id }}" class="elevation-container w-full h-56 mt-6 mb-12 relative">
             <div id="elevation-loading-{{ route.id }}" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
                 <div class="text-center">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
@@ -59,6 +109,35 @@
             </div>
         </div>
     </div>
+    
+    <!-- Visual separator to ensure clear separation -->
+    <div class="section-separator"></div>
+    
+    <!-- Cafes near this route -->
+    {% if cafes_near_route %}
+    <div class="cafes-section mt-8 mb-8 clear-both">
+        <h2 class="text-xl font-semibold mb-4 text-gray-800">Cafes along this route ({{ cafes_near_route|length }})</h2>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {% for cafe in cafes_near_route %}
+            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm">
+                <h3 class="font-semibold text-gray-900">{{ cafe.name }}</h3>
+                {% if cafe.description %}
+                    <p class="text-gray-700 text-sm mt-1">{{ cafe.description }}</p>
+                {% endif %}
+                <div class="mt-2 text-xs text-gray-500 space-y-1">
+                    <p><span class="font-medium">Distance to route:</span> {{ "%.0f"|format(cafe.distance_to_route) }}m</p>
+                    {% if cafe.opening_hours %}
+                        <p><span class="font-medium">Hours:</span> {{ cafe.opening_hours }}</p>
+                    {% endif %}
+                    {% if cafe.website %}
+                        <p><a href="{{ cafe.website }}" target="_blank" class="text-blue-600 hover:underline">Visit Website</a></p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
 
@@ -163,6 +242,32 @@ document.addEventListener("DOMContentLoaded", function () {
         elevationLoading.innerHTML = '<div class="text-center"><p class="text-red-600">Error loading elevation data</p></div>';
     })
     .addTo(map);
+
+    // Add cafe markers to the map
+    const allCafes = {{ all_cafes|tojson }};
+    const cafesNearRoute = {{ cafes_near_route|tojson }};
+    
+    allCafes.forEach(function(cafe) {
+        const isNearRoute = cafesNearRoute.some(nearCafe => nearCafe.id === cafe.id);
+        
+        // Use different colors for cafes near the route vs all cafes
+        const marker = L.marker([cafe.latitude, cafe.longitude], {
+            icon: L.divIcon({
+                className: isNearRoute ? 'cafe-marker-near' : 'cafe-marker-far',
+                html: isNearRoute ? '☕' : '☕',
+                iconSize: [20, 20],
+                iconAnchor: [10, 10]
+            })
+        }).bindPopup(`
+            <div class="p-2">
+                <h4 class="font-semibold">${cafe.name}</h4>
+                ${cafe.description ? `<p class="text-sm text-gray-600 mt-1">${cafe.description}</p>` : ''}
+                ${cafe.opening_hours ? `<p class="text-xs text-gray-500 mt-1"><strong>Hours:</strong> ${cafe.opening_hours}</p>` : ''}
+                ${cafe.website ? `<p class="text-xs mt-1"><a href="${cafe.website}" target="_blank" class="text-blue-600 hover:underline">Visit Website</a></p>` : ''}
+                ${isNearRoute ? `<p class="text-xs text-green-600 font-medium mt-1">Near this route!</p>` : ''}
+            </div>
+        `).addTo(map);
+    });
 });
 </script>
 {% endblock %}

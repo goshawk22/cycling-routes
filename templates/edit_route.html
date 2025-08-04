@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}Edit Route{% endblock %}
+
+{% block content %}
+<div class="max-w-lg mx-auto mt-10 bg-white border border-gray-200 rounded-xl shadow p-8">
+    <h1 class="text-2xl font-bold mb-6">Edit Route</h1>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <div class="mb-4">
+          {% for message in messages %}
+            <div class="bg-green-100 border border-green-300 text-green-700 px-4 py-2 rounded mb-2">
+              {{ message }}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+    {% endwith %}
+
+    <form method="POST" class="flex flex-col gap-4">
+        <div>
+            <label for="name" class="block font-medium mb-1">Route Name</label>
+            <input type="text" name="name" id="name" required value="{{ route.name }}"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </div>
+        
+        <div>
+            <label for="description" class="block font-medium mb-1">Description</label>
+            <textarea name="description" id="description" rows="4" required
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">{{ route.description }}</textarea>
+        </div>
+        
+        <div>
+            <label for="tags" class="block font-medium mb-1">Tags (comma-separated)</label>
+            <input type="text" name="tags" id="tags" placeholder="e.g. gravel, loop, intervals" value="{{ route.tags }}"
+                class="w-full rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        </div>
+        
+        <!-- Show read-only information about the route -->
+        <div class="bg-gray-50 p-4 rounded-md">
+            <h3 class="font-medium text-gray-700 mb-2">Route Information (read-only)</h3>
+            <div class="text-sm text-gray-600 space-y-1">
+                <p><span class="font-medium">Distance:</span> {{ route.distance|round(2) }} km</p>
+                <p><span class="font-medium">Elevation Gain:</span> {{ route.elevation_gain|round|int }} m</p>
+                <p><span class="font-medium">Difficulty:</span> {{ route.difficulty }}</p>
+                <p><span class="font-medium">Start Location:</span> {{ route.start_location }}</p>
+                <p><span class="font-medium">Offroad:</span> {{ "Yes" if route.offroad else "No" }}</p>
+            </div>
+            <p class="text-xs text-gray-500 mt-2">These values are automatically calculated from the GPX file and cannot be edited.</p>
+        </div>
+        
+        <button type="submit"
+            class="w-full mt-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded-md transition">Update Route</button>
+    </form>
+    
+    <div class="mt-6 flex gap-4 text-sm">
+        <a href="/route/{{ route.id }}" class="text-blue-600 hover:underline">← Back to route</a>
+    </div>
+</div>
+{% endblock %}

@@ -16,13 +16,13 @@ from flask_compress import Compress
 
 # This below command enables Gzip compression for the Flask app
 # It compresses responses before sending them to clients,
-# reducing data transfer and improving performance
+# reducing data transfer and improves performance
 Compress(app)
 
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-# SQLite setup
+# SQLite setup, support routes and cafes
 def init_db():
     with sqlite3.connect('routes.db') as conn:
         conn.execute('''CREATE TABLE IF NOT EXISTS routes (
@@ -37,6 +37,15 @@ def init_db():
             difficulty TEXT,
             offroad INTEGER DEFAULT 0
         )''')
+        conn.execute('''CREATE TABLE IF NOT EXISTS cafes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL,
+            latitude REAL NOT NULL,
+            longitude REAL NOT NULL,
+            description TEXT,
+            website TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )''')
 init_db()
 
 def haversine(lat1, lon1, lat2, lon2):
@@ -49,6 +58,53 @@ def haversine(lat1, lon1, lat2, lon2):
     a = math.sin(dphi/2)**2 + math.cos(phi1)*math.cos(phi2)*math.sin(dlambda/2)**2
     return 2*R*math.atan2(math.sqrt(a), math.sqrt(1 - a))
 
+def get_cafes_near_route(gpx_file, max_distance_m=2000):
+    # Find cafes within max_distance_m meters of the route
+    cafes_near_route = []
+    
+    # Get all cafes
+    conn = sqlite3.connect('routes.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM cafes')
+    all_cafes = c.fetchall()
+    conn.close()
+    
+    if not all_cafes:
+        return []
+    
+    # Parse GPX to get route points
+    # Try except to avoid crashing
+    try:
+        with open(os.path.join(UPLOAD_FOLDER, gpx_file), 'r') as f:
+            gpx = gpxpy.parse(f)
+            route_points = []
+            for track in gpx.tracks:
+                for segment in track.segments:
+                    for point in segment.points:
+                        route_points.append((point.latitude, point.longitude))
+    except:
+        return []
+    
+    # Check each cafe against route points
+    for cafe in all_cafes:
+        min_distance = float('inf')
+        for lat, lon in route_points:
+            distance = haversine(cafe['latitude'], cafe['longitude'], lat, lon)
+            # update minimum distance
+            if distance < min_distance:
+                min_distance = distance
+        
+        # cafe is close enough to the route
+        if min_distance <= max_distance_m:
+            cafe_dict = dict(cafe)
+            cafe_dict['distance_to_route'] = min_distance
+            cafes_near_route.append(cafe_dict)
+    
+    # Sort by distance to route
+    cafes_near_route.sort(key=lambda x: x['distance_to_route'])
+    return cafes_near_route
+
 # Coordinates for Campus and Leamington Spa
 CAMPUS = (52.3813, -1.5616)      # University of Warwick
 LEAMINGTON = (52.2922, -1.5354)  # Leamington Spa
@@ -60,10 +116,22 @@ def route(route_id):
     c = conn.cursor()
     c.execute('SELECT * FROM routes WHERE id = ?', (route_id,))
     route = c.fetchone()
+    
+    # Get all cafes for the map
+    c.execute('SELECT * FROM cafes')
+    all_cafes_rows = c.fetchall()
     conn.close()
+    
     if not route:
         return "Route not found", 404
-    return render_template('route.html', route=route)
+    
+    # Convert Row objects to dictionaries for JSON serialization
+    all_cafes = [dict(row) for row in all_cafes_rows]
+    
+    # Get cafes near this route
+    cafes_near_route = get_cafes_near_route(route['gpx_file'])
+    
+    return render_template('route.html', route=route, cafes_near_route=cafes_near_route, all_cafes=all_cafes)
 
 @app.route('/')
 def index():
@@ -75,6 +143,104 @@ def index():
     conn.close()
     return render_template('index.html', routes=routes, request=request)
 
+@app.route('/cafes')
+def cafes():
+    # Get all cafes from the database
+    conn = sqlite3.connect('routes.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute("SELECT * FROM cafes ORDER BY name")
+    cafes_rows = c.fetchall()
+    conn.close()
+    
+    # Convert Row objects to dictionaries for JSON serialization
+    cafes = [dict(row) for row in cafes_rows]
+    
+    return render_template('cafes.html', cafes=cafes)
+
+@app.route('/cafe/add', methods=['GET', 'POST'])
+def add_cafe():
+    # add a new cafe
+    if request.method == 'POST':
+        name = request.form['name']
+        latitude = float(request.form['latitude'])
+        longitude = float(request.form['longitude'])
+        description = request.form['description']
+        website = request.form['website']
+        
+        with sqlite3.connect('routes.db') as conn:
+            conn.execute('''INSERT INTO cafes (name, latitude, longitude, description, website) 
+                           VALUES (?, ?, ?, ?, ?)''',
+                        (name, latitude, longitude, description, website))
+        
+        flash("Cafe added successfully!")
+        return redirect('/cafes')
+    
+    return render_template('add_cafe.html')
+
+@app.route('/cafe/edit/<int:cafe_id>', methods=['GET', 'POST'])
+def edit_cafe(cafe_id):
+    # edit an existing cafe
+    # bit risky as anyone can do this, but it's to keep it simple.
+    if request.method == 'POST':
+        name = request.form['name']
+        latitude = float(request.form['latitude'])
+        longitude = float(request.form['longitude'])
+        description = request.form['description']
+        website = request.form['website']
+        
+        with sqlite3.connect('routes.db') as conn:
+            conn.execute('''UPDATE cafes SET name=?, latitude=?, longitude=?, description=?, website=? 
+                           WHERE id=?''',
+                        (name, latitude, longitude, description, website, cafe_id))
+
+        flash("Cafe updated successfully!")
+        return redirect('/cafes')
+    
+    # Get existing cafe data
+    conn = sqlite3.connect('routes.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM cafes WHERE id = ?', (cafe_id,))
+    cafe = c.fetchone()
+    conn.close()
+    
+    if not cafe:
+        flash("Cafe not found!")
+        return redirect('/cafes')
+    
+    return render_template('edit_cafe.html', cafe=cafe)
+
+@app.route('/route/edit/<int:route_id>', methods=['GET', 'POST'])
+def edit_route(route_id):
+    # edit an existing route
+    # again a bit risky as anyone can do this, but it's to keep it simple.
+    if request.method == 'POST':
+        name = request.form['name']
+        description = request.form['description']
+        tags = request.form['tags']
+        
+        with sqlite3.connect('routes.db') as conn:
+            conn.execute('''UPDATE routes SET name=?, description=?, tags=? WHERE id=?''',
+                        (name, description, tags, route_id))
+        
+        flash("Route updated successfully!")
+        return redirect(f'/route/{route_id}')
+    
+    # Get existing route data
+    conn = sqlite3.connect('routes.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    c.execute('SELECT * FROM routes WHERE id = ?', (route_id,))
+    route = c.fetchone()
+    conn.close()
+    
+    if not route:
+        flash("Route not found!")
+        return redirect('/')
+    
+    return render_template('edit_route.html', route=route)
+
 @app.route('/upload', methods=['GET', 'POST'])
 def upload():
     if request.method == 'POST':
@@ -83,6 +249,14 @@ def upload():
         description = request.form['description']
         tags = request.form['tags']
         offroad = int(request.form.get('offroad', '0'))
+        
+        # Handle cafe addition
+        add_cafe_option = request.form.get('add_cafe', '0')
+        cafe_name = request.form.get('cafe_name', '').strip()
+        cafe_lat = request.form.get('cafe_latitude', '').strip()
+        cafe_lon = request.form.get('cafe_longitude', '').strip()
+        cafe_desc = request.form.get('cafe_description', '').strip()
+        cafe_website = request.form.get('cafe_website', '').strip()
 
         # Check file size (already enforced by Flask, but for user-friendly error)
         file.seek(0, os.SEEK_END)
@@ -205,8 +379,23 @@ def upload():
 
         # Update the row with the real filename, stats, and difficulty, and static image
         with sqlite3.connect('routes.db') as conn:
-            conn.execute('UPDATE routes SET gpx_file=?, distance=?, elevation_gain=?, start_location=?, difficulty=? WHERE id=?',
+            c = conn.cursor()
+            c.execute('UPDATE routes SET gpx_file=?, distance=?, elevation_gain=?, start_location=?, difficulty=? WHERE id=?',
                          (unique_filename, dist_km, elevation_gain, start_location, difficulty, route_id))
+            
+            # Add cafe if requested
+            if add_cafe_option == '1' and cafe_name and cafe_lat and cafe_lon:
+                try:
+                    lat = float(cafe_lat)
+                    lon = float(cafe_lon)
+                    c.execute('''INSERT INTO cafes (name, latitude, longitude, description, website) 
+                               VALUES (?, ?, ?, ?, ?)''',
+                             (cafe_name, lat, lon, cafe_desc, cafe_website))
+                    flash(f"Route uploaded and cafe '{cafe_name}' added successfully!")
+                except ValueError:
+                    flash("Route uploaded, but cafe coordinates were invalid.")
+            elif add_cafe_option == '1':
+                flash("Route uploaded, but cafe information was incomplete.")
 
         return redirect('/')
     return render_template('upload.html')

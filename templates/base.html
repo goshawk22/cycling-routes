@@ -16,6 +16,31 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
     <link rel="stylesheet" href="https://unpkg.com/@goshawk22/leaflet-elevation@2.5.3/dist/leaflet-elevation.css" />
     
+    <style>
+        .cafe-marker-near {
+            background: #10b981;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        .cafe-marker-far {
+            background: #6b7280;
+            color: white;
+            border: 2px solid white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+    </style>
+    
     {% block head %}{% endblock %}
 </head>
 <body class="bg-gray-50 text-gray-900">
