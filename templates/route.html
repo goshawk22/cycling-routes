@@ -42,64 +42,93 @@
         </div>
     </div>
     <div class="mb-8">
-        <div id="map-{{ route.id }}" class="w-full h-96 rounded-lg border border-gray-200"></div>
-        <div id="elevation-{{ route.id }}" class="w-full h-56 mt-6"></div>
+        <div id="map-{{ route.id }}" class="w-full h-96 rounded-lg border border-gray-200 relative">
+            <div id="map-loading-{{ route.id }}" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                    <p class="text-gray-600">Loading map...</p>
+                </div>
+            </div>
+        </div>
+        <div id="elevation-{{ route.id }}" class="w-full h-56 mt-6 relative">
+            <div id="elevation-loading-{{ route.id }}" class="absolute inset-0 flex items-center justify-center bg-gray-100 rounded-lg">
+                <div class="text-center">
+                    <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                    <p class="text-gray-600 text-sm">Loading elevation profile...</p>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block scripts %}
-<!-- Leaflet core -->
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-
-<!-- Raruto/leaflet-elevation plugin (correct CDN) -->
-<link rel="stylesheet" href="https://unpkg.com/@goshawk22/leaflet-elevation@2.5.3/dist/leaflet-elevation.css" />
-<script src="https://unpkg.com/@goshawk22/leaflet-elevation@2.5.3/dist/leaflet-elevation.js"></script>
-
-
-<!-- leaflet-gpx for GPX parsing -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet-gpx/1.7.0/gpx.min.js"></script>
-
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    // Create the map
-    const map = L.map("map-{{ route.id }}").setView([51.505, -0.09], 13);
-    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 18 }).addTo(map);
+    // Ensure Leaflet is loaded before proceeding
+    if (typeof L === 'undefined') {
+        console.error('Leaflet is not loaded');
+        return;
+    }
 
-    // Create the elevation control (Raruto/leaflet-elevation)
+    const routeId = "{{ route.id }}";
+    const mapElement = document.getElementById(`map-${routeId}`);
+    const elevationElement = document.getElementById(`elevation-${routeId}`);
+    const mapLoading = document.getElementById(`map-loading-${routeId}`);
+    const elevationLoading = document.getElementById(`elevation-loading-${routeId}`);
+
+    // Create the map with better performance settings
+    const map = L.map(`map-${routeId}`, {
+        preferCanvas: true,
+        zoomControl: true,
+        attributionControl: true
+    }).setView([51.505, -0.09], 13);
+
+    // Add tile layer with better caching
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { 
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+    }).addTo(map);
+
+    // Hide map loading indicator once map is ready
+    map.whenReady(function() {
+        mapLoading.style.display = 'none';
+    });
+
+    // Create the elevation control
     const elevation = L.control.elevation({
         position: "bottomright",
         theme: "lightblue-theme",
         yAxisMin: 0,
         detached: true,
-        elevationDiv: "#elevation-{{ route.id }}",
+        elevationDiv: `#elevation-${routeId}`,
         collapsed: false,
         autohide: false,
+        autohideMarker: true,
         followMarker: false,
-        almostOver: false,
+        almostOver: true,
         legend: false,
         summary: 'inline',
         imperial: false,
         ruler: false,
         hotline: false,
-        waypoints: false,
-        preferCanvas: false,
+        waypoints: true,
+        preferCanvas: true,
         closeBtn: false,
         slope: 'summary',
         time: false,
         edgeScale: true,
         linearGradient: true,
-		handlers: [
-			'Altitude',      // same as: import('../src/handlers/altitude.js')
-			'Distance',      // same as: import('../src/handlers/distance.js')
-			'Slope',         // same as: import('../src/handlers/slope.js')
-			'LinearGradient' // same as: import('../src/handlers/lineargradient.js')
-		],
+        handlers: [
+            'Altitude',
+            'Distance',
+            'Slope',
+            'LinearGradient'
+        ],
     });
     elevation.addTo(map);
 
-    // Load the GPX and add to map and elevation
+    // Load the GPX file
     const gpx = new L.GPX("/uploads/{{ route.gpx_file }}", {
         async: true,
         marker_options: {
@@ -115,10 +144,23 @@ document.addEventListener("DOMContentLoaded", function () {
         }
     })
     .on("loaded", function(e) {
+        // Fit map to route bounds
         map.fitBounds(e.target.getBounds());
+        
+        // Hide loading indicators
+        mapLoading.style.display = 'none';
     })
     .on("addline", function(e) {
+        // Add elevation data
         elevation.addData(e.line);
+        
+        // Hide elevation loading indicator
+        elevationLoading.style.display = 'none';
+    })
+    .on("error", function(e) {
+        // Handle loading errors
+        mapLoading.innerHTML = '<div class="text-center"><p class="text-red-600">Error loading route</p></div>';
+        elevationLoading.innerHTML = '<div class="text-center"><p class="text-red-600">Error loading elevation data</p></div>';
     })
     .addTo(map);
 });
