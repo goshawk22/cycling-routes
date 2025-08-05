@@ -1,14 +1,6 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>About</title>
-</head>
-<body>
-  {% extends "base.html" %}
-  {% block title %}About{% endblock %}
-  {% block content %}
+{% extends "base.html" %}
+{% block title %}About{% endblock %}
+{% block content %}
   <div class="max-w-2xl mx-auto mt-10 bg-white border border-gray-200 rounded-xl shadow p-8 relative">
     <a href="/" class="absolute top-4 right-4 text-blue-600 hover:underline text-sm font-semibold">← Back</a>
     <h1 class="text-2xl font-bold mb-4">About</h1>
@@ -37,5 +29,3 @@
     <p>Feel free to report issues (as long as I can fix them). Contributions are welcome! (and very much needed)</p>
   </div>
   {% endblock %}
-</body>
-</html>
