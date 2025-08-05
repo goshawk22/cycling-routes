@@ -241,8 +241,8 @@ def edit_route(route_id):
     
     return render_template('edit_route.html', route=route)
 
-@app.route('/upload', methods=['GET', 'POST'])
-def upload():
+@app.route('/route/add', methods=['GET', 'POST'])
+def add_route():
     if request.method == 'POST':
         file = request.files['gpx_file']
         name = request.form['name']
@@ -264,13 +264,13 @@ def upload():
         file.seek(0)
         if file_length > 5 * 1024 * 1024:
             flash("File is too large (max 5MB).")
-            return render_template('upload.html')
+            return render_template('add_route.html')
 
         # Check file extension
         ext = os.path.splitext(file.filename)[1].lower()
         if ext != '.gpx':
             flash("Only GPX files are allowed.")
-            return render_template('upload.html')
+            return render_template('add_route.html')
 
         import re
         safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name.strip())[:40]
@@ -396,9 +396,12 @@ def upload():
                     flash("Route uploaded, but cafe coordinates were invalid.")
             elif add_cafe_option == '1':
                 flash("Route uploaded, but cafe information was incomplete.")
+            else:
+                # General success message when no cafe is added
+                flash("Route uploaded successfully!")
 
         return redirect('/')
-    return render_template('upload.html')
+    return render_template('add_route.html')
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
@@ -407,7 +410,7 @@ def uploaded_file(filename):
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):
     flash("File is too large (max 5MB).")
-    return render_template('upload.html'), 413
+    return render_template('add_route.html'), 413
 
 @app.route('/privacy-policy')
 def privacy_policy():

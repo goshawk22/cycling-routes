@@ -10,9 +10,22 @@
         <h1 class="text-3xl font-bold">Cycling Routes</h1>
         <div class="flex gap-3">
             <a href="/cafes" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">View Cafes</a>
-            <a href="/upload" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Upload New Route</a>
+            <a href="/route/add" class="inline-block text-base border border-gray-300 rounded-lg px-4 py-2 bg-gray-100 hover:bg-blue-50 transition font-medium">Upload New Route</a>
         </div>
     </div>
+
+    <!-- Flash messages -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="max-w-6xl mx-auto px-4 mb-6">
+                {% for message in messages %}
+                    <div class="bg-green-100 border border-green-300 text-green-700 px-4 py-3 rounded mb-2">
+                        {{ message }}
+                    </div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
 
     <div class="max-w-6xl mx-auto px-4 flex gap-8 items-start">
         <aside class="w-80 bg-white border border-gray-200 rounded-xl shadow p-6 sticky top-6 mt-6">
