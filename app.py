@@ -22,7 +22,7 @@ EARTH_RADIUS_M = 6371000
 MAX_FILE_SIZE = 5 * 1024 * 1024  # 5MB
 UNKNOWN_LOCATION_THRESHOLD_M = 10000
 STATIC_MAP_SIZE = (400, 300)
-DEBUG = True  # Set to False in production
+DEBUG = False  # Set to False in production
 
 # Coordinates
 CAMPUS = (52.3813, -1.5616)      # University of Warwick
