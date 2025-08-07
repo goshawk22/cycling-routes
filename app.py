@@ -5,10 +5,14 @@ import secrets
 import re
 import gpxpy
 import srtm
-from flask import Flask, render_template, request, redirect, send_from_directory, flash
+import bleach
+from flask import Flask, render_template, request, redirect, send_from_directory, flash, make_response
 from flask_compress import Compress
+from flask_limiter import Limiter
+from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import RequestEntityTooLarge
 from staticmap import StaticMap, Line
+from urllib.parse import urlparse
 
 # Constants
 UPLOAD_FOLDER = 'uploads'
@@ -31,7 +35,65 @@ app.secret_key = secrets.token_hex(32)
 # Enable Gzip compression
 Compress(app)
 
+# Setup rate limiting
+limiter = Limiter(
+    key_func=get_remote_address,
+    app=app,
+    default_limits=["200 per day", "50 per hour"]
+)
+
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+
+def sanitize_input(text, allow_links=False):
+    """Sanitize user input to prevent XSS attacks."""
+    if not text:
+        return ""
+    
+    # Basic allowed tags for descriptions
+    allowed_tags = ['p', 'br', 'strong', 'em', 'ul', 'ol', 'li']
+    if allow_links:
+        allowed_tags.extend(['a'])
+    
+    # Allowed attributes
+    allowed_attributes = {}
+    if allow_links:
+        allowed_attributes['a'] = ['href', 'title']
+    
+    # Clean the input
+    cleaned = bleach.clean(
+        text.strip(),
+        tags=allowed_tags,
+        attributes=allowed_attributes,
+        strip=True
+    )
+    
+    return cleaned
+
+def validate_coordinates(lat, lon):
+    """Validate latitude and longitude coordinates."""
+    try:
+        lat_float = float(lat)
+        lon_float = float(lon)
+        
+        if not (-90 <= lat_float <= 90):
+            return False, "Latitude must be between -90 and 90"
+        if not (-180 <= lon_float <= 180):
+            return False, "Longitude must be between -180 and 180"
+            
+        return True, (lat_float, lon_float)
+    except (ValueError, TypeError):
+        return False, "Invalid coordinate format"
+
+def validate_url(url):
+    """Validate URL format."""
+    if not url:
+        return True  # Empty URL is allowed
+    
+    try:
+        result = urlparse(url)
+        return all([result.scheme, result.netloc]) and result.scheme in ['http', 'https']
+    except:
+        return False
 
 def get_db_connection():
     """Get a database connection."""
@@ -40,7 +102,7 @@ def get_db_connection():
     return conn
 
 def init_db():
-    """Initialize the database with required tables."""
+    """Initialize the database with required tables and indexes."""
     with get_db_connection() as conn:
         conn.execute('''CREATE TABLE IF NOT EXISTS routes (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -63,6 +125,14 @@ def init_db():
             website TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )''')
+        
+        # Create indexes for better query performance
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_routes_difficulty ON routes(difficulty)''')
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_routes_start_location ON routes(start_location)''')
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_routes_offroad ON routes(offroad)''')
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_routes_distance ON routes(distance)''')
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_cafes_location ON cafes(latitude, longitude)''')
+        conn.execute('''CREATE INDEX IF NOT EXISTS idx_cafes_name ON cafes(name)''')
 
 init_db()
 
@@ -224,14 +294,36 @@ def add_cafe_if_requested(conn, add_cafe_option, cafe_name, cafe_lat, cafe_lon, 
     """Add a cafe if the option is selected and data is valid."""
     if add_cafe_option == '1' and cafe_name and cafe_lat and cafe_lon:
         try:
-            lat = float(cafe_lat)
-            lon = float(cafe_lon)
+            # Sanitize inputs
+            name = sanitize_input(cafe_name.strip())
+            desc = sanitize_input(cafe_desc.strip() if cafe_desc else '', allow_links=True)
+            website = cafe_website.strip() if cafe_website else ''
+            
+            # Validate name length
+            if len(name) > 100:
+                return "Route uploaded, but cafe name was too long."
+            
+            # Validate coordinates
+            valid_coords, coord_result = validate_coordinates(cafe_lat, cafe_lon)
+            if not valid_coords:
+                return f"Route uploaded, but cafe coordinates were invalid: {coord_result}"
+            
+            lat, lon = coord_result
+            
+            # Validate website URL if provided
+            if website and not validate_url(website):
+                return "Route uploaded, but cafe website URL was invalid."
+            
+            # Validate description length
+            if len(desc) > 1000:
+                return "Route uploaded, but cafe description was too long."
+            
             conn.execute('''INSERT INTO cafes (name, latitude, longitude, description, website) 
                            VALUES (?, ?, ?, ?, ?)''',
-                         (cafe_name, lat, lon, cafe_desc, cafe_website))
-            return f"Route uploaded and cafe '{cafe_name}' added successfully!"
-        except ValueError:
-            return "Route uploaded, but cafe coordinates were invalid."
+                         (name, lat, lon, desc, website))
+            return f"Route uploaded and cafe '{name}' added successfully!"
+        except (ValueError, sqlite3.Error) as e:
+            return f"Route uploaded, but cafe could not be added: {str(e)}"
     elif add_cafe_option == '1':
         return "Route uploaded, but cafe information was incomplete."
     else:
@@ -283,91 +375,220 @@ def cafes():
     return render_template('cafes.html', cafes=cafes)
 
 @app.route('/cafe/add', methods=['GET', 'POST'])
+@limiter.limit("2 per minute")
 def add_cafe():
     """Add a new cafe."""
     if request.method == 'POST':
-        name = request.form['name']
-        latitude = float(request.form['latitude'])
-        longitude = float(request.form['longitude'])
-        description = request.form['description']
-        website = request.form['website']
+        # Get and sanitize inputs
+        name = sanitize_input(request.form.get('name', '').strip())
+        latitude_str = request.form.get('latitude', '').strip()
+        longitude_str = request.form.get('longitude', '').strip()
+        description = sanitize_input(request.form.get('description', ''), allow_links=True)
+        website = request.form.get('website', '').strip()
         
-        with get_db_connection() as conn:
-            conn.execute('''INSERT INTO cafes (name, latitude, longitude, description, website) 
-                           VALUES (?, ?, ?, ?, ?)''',
-                        (name, latitude, longitude, description, website))
+        # Validate required fields
+        if not name:
+            flash("Cafe name is required.")
+            return render_template('add_cafe.html')
         
-        flash("Cafe added successfully!")
-        return redirect('/cafes')
+        if len(name) > 100:
+            flash("Cafe name must be less than 100 characters.")
+            return render_template('add_cafe.html')
+        
+        # Validate coordinates
+        valid_coords, coord_result = validate_coordinates(latitude_str, longitude_str)
+        if not valid_coords:
+            flash(f"Invalid coordinates: {coord_result}")
+            return render_template('add_cafe.html')
+        
+        latitude, longitude = coord_result
+        
+        # Validate website URL if provided
+        if website and not validate_url(website):
+            flash("Invalid website URL format.")
+            return render_template('add_cafe.html')
+        
+        # Validate description length
+        if len(description) > 1000:
+            flash("Description must be less than 1000 characters.")
+            return render_template('add_cafe.html')
+        
+        try:
+            with get_db_connection() as conn:
+                conn.execute('''INSERT INTO cafes (name, latitude, longitude, description, website) 
+                               VALUES (?, ?, ?, ?, ?)''',
+                            (name, latitude, longitude, description, website))
+            
+            flash("Cafe added successfully!")
+            return redirect('/cafes')
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}")
+            return render_template('add_cafe.html')
     
     return render_template('add_cafe.html')
 
 @app.route('/cafe/edit/<int:cafe_id>', methods=['GET', 'POST'])
+@limiter.limit("10 per minute")
 def edit_cafe(cafe_id):
     """Edit an existing cafe."""
     if request.method == 'POST':
-        name = request.form['name']
-        latitude = float(request.form['latitude'])
-        longitude = float(request.form['longitude'])
-        description = request.form['description']
-        website = request.form['website']
+        # Get and sanitize inputs
+        name = sanitize_input(request.form.get('name', '').strip())
+        latitude_str = request.form.get('latitude', '').strip()
+        longitude_str = request.form.get('longitude', '').strip()
+        description = sanitize_input(request.form.get('description', ''), allow_links=True)
+        website = request.form.get('website', '').strip()
         
-        with get_db_connection() as conn:
-            conn.execute('''UPDATE cafes SET name=?, latitude=?, longitude=?, description=?, website=? 
-                           WHERE id=?''',
-                        (name, latitude, longitude, description, website, cafe_id))
+        # Validate required fields
+        if not name:
+            flash("Cafe name is required.")
+            return redirect(f'/cafe/edit/{cafe_id}')
+        
+        if len(name) > 100:
+            flash("Cafe name must be less than 100 characters.")
+            return redirect(f'/cafe/edit/{cafe_id}')
+        
+        # Validate coordinates
+        valid_coords, coord_result = validate_coordinates(latitude_str, longitude_str)
+        if not valid_coords:
+            flash(f"Invalid coordinates: {coord_result}")
+            return redirect(f'/cafe/edit/{cafe_id}')
+        
+        latitude, longitude = coord_result
+        
+        # Validate website URL if provided
+        if website and not validate_url(website):
+            flash("Invalid website URL format.")
+            return redirect(f'/cafe/edit/{cafe_id}')
+        
+        # Validate description length
+        if len(description) > 1000:
+            flash("Description must be less than 1000 characters.")
+            return redirect(f'/cafe/edit/{cafe_id}')
+        
+        try:
+            with get_db_connection() as conn:
+                conn.execute('''UPDATE cafes SET name=?, latitude=?, longitude=?, description=?, website=? 
+                               WHERE id=?''',
+                            (name, latitude, longitude, description, website, cafe_id))
 
-        flash("Cafe updated successfully!")
-        return redirect('/cafes')
+            flash("Cafe updated successfully!")
+            return redirect('/cafes')
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}")
+            return redirect(f'/cafe/edit/{cafe_id}')
     
     # Get existing cafe data
-    with get_db_connection() as conn:
-        c = conn.cursor()
-        c.execute('SELECT * FROM cafes WHERE id = ?', (cafe_id,))
-        cafe = c.fetchone()
-    
-    if not cafe:
-        flash("Cafe not found!")
+    try:
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute('SELECT * FROM cafes WHERE id = ?', (cafe_id,))
+            cafe = c.fetchone()
+        
+        if not cafe:
+            flash("Cafe not found!")
+            return redirect('/cafes')
+        
+        return render_template('edit_cafe.html', cafe=cafe)
+    except sqlite3.Error as e:
+        flash(f"Database error: {str(e)}")
         return redirect('/cafes')
-    
-    return render_template('edit_cafe.html', cafe=cafe)
 
 @app.route('/route/edit/<int:route_id>', methods=['GET', 'POST'])
+@limiter.limit("5 per minute")
 def edit_route(route_id):
-    """Edit an existing route."""
+    """Edit an existing route with input validation and sanitization."""
     if request.method == 'POST':
-        name = request.form['name']
-        description = request.form['description']
-        tags = request.form['tags']
+        # Get and sanitize inputs
+        name = sanitize_input(request.form.get('name', '').strip())
+        description = sanitize_input(request.form.get('description', ''), allow_links=True)
+        tags = sanitize_input(request.form.get('tags', '').strip())
         
-        with get_db_connection() as conn:
-            conn.execute('''UPDATE routes SET name=?, description=?, tags=? WHERE id=?''',
-                        (name, description, tags, route_id))
+        # Validate required fields
+        if not name:
+            flash("Route name is required.")
+            return redirect(f'/route/edit/{route_id}')
         
-        flash("Route updated successfully!")
-        return redirect(f'/route/{route_id}')
+        if len(name) > 100:
+            flash("Route name must be less than 100 characters.")
+            return redirect(f'/route/edit/{route_id}')
+        
+        if len(description) > 2000:
+            flash("Description must be less than 2000 characters.")
+            return redirect(f'/route/edit/{route_id}')
+        
+        if len(tags) > 200:
+            flash("Tags must be less than 200 characters.")
+            return redirect(f'/route/edit/{route_id}')
+        
+        try:
+            with get_db_connection() as conn:
+                conn.execute('''UPDATE routes SET name=?, description=?, tags=? WHERE id=?''',
+                            (name, description, tags, route_id))
+            
+            flash("Route updated successfully!")
+            return redirect(f'/route/{route_id}')
+        except sqlite3.Error as e:
+            flash(f"Database error: {str(e)}")
+            return redirect(f'/route/edit/{route_id}')
     
     # Get existing route data
-    with get_db_connection() as conn:
-        c = conn.cursor()
-        c.execute('SELECT * FROM routes WHERE id = ?', (route_id,))
-        route = c.fetchone()
-    
-    if not route:
-        flash("Route not found!")
+    try:
+        with get_db_connection() as conn:
+            c = conn.cursor()
+            c.execute('SELECT * FROM routes WHERE id = ?', (route_id,))
+            route = c.fetchone()
+        
+        if not route:
+            flash("Route not found!")
+            return redirect('/')
+        
+        return render_template('edit_route.html', route=route)
+    except sqlite3.Error as e:
+        flash(f"Database error: {str(e)}")
         return redirect('/')
-    
-    return render_template('edit_route.html', route=route)
 
 @app.route('/route/add', methods=['GET', 'POST'])
+@limiter.limit("3 per minute")
 def add_route():
-    """Add a new route with GPX file upload."""
+    """Add a new route with GPX file upload, input validation and sanitization."""
     if request.method == 'POST':
-        file = request.files['gpx_file']
-        name = request.form['name']
-        description = request.form['description']
-        tags = request.form['tags']
-        offroad = int(request.form.get('offroad', '0'))
+        file = request.files.get('gpx_file')
+        name = sanitize_input(request.form.get('name', '').strip())
+        description = sanitize_input(request.form.get('description', ''), allow_links=True)
+        tags = sanitize_input(request.form.get('tags', '').strip())
+        offroad = request.form.get('offroad', '0')
+        
+        # Validate required fields
+        if not file or not file.filename:
+            flash("GPX file is required.")
+            return render_template('add_route.html')
+        
+        if not name:
+            flash("Route name is required.")
+            return render_template('add_route.html')
+        
+        # Validate input lengths
+        if len(name) > 100:
+            flash("Route name must be less than 100 characters.")
+            return render_template('add_route.html')
+        
+        if len(description) > 2000:
+            flash("Description must be less than 2000 characters.")
+            return render_template('add_route.html')
+        
+        if len(tags) > 200:
+            flash("Tags must be less than 200 characters.")
+            return render_template('add_route.html')
+        
+        # Validate offroad value
+        try:
+            offroad = int(offroad)
+            if offroad not in [0, 1]:
+                raise ValueError
+        except (ValueError, TypeError):
+            flash("Invalid offroad value.")
+            return render_template('add_route.html')
         
         # Handle cafe addition
         add_cafe_option = request.form.get('add_cafe', '0')
@@ -392,22 +613,22 @@ def add_route():
             flash("Only GPX files are allowed.")
             return render_template('add_route.html')
 
-        # Create safe filename
-        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name.strip())[:40]
-
-        # Insert a dummy row to get the next id
-        with get_db_connection() as conn:
-            c = conn.cursor()
-            c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location, difficulty, offroad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
-                      (name, description, tags, '', 0, 0, '', '', offroad))
-            route_id = c.lastrowid
-
-        # Save file
-        unique_filename = f"{route_id}-{safe_name}{ext}"
-        filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
-        file.save(filepath)
+        # Create safe filename (sanitize filename)
+        safe_name = re.sub(r'[^a-zA-Z0-9_-]', '_', name)[:40]
 
         try:
+            # Insert a dummy row to get the next id
+            with get_db_connection() as conn:
+                c = conn.cursor()
+                c.execute('INSERT INTO routes (name, description, tags, gpx_file, distance, elevation_gain, start_location, difficulty, offroad) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                          (name, description, tags, '', 0, 0, '', '', offroad))
+                route_id = c.lastrowid
+
+            # Save file
+            unique_filename = f"{route_id}-{safe_name}{ext}"
+            filepath = os.path.join(UPLOAD_FOLDER, unique_filename)
+            file.save(filepath)
+
             # Process GPX file
             gpx, distance, elevation_gain, first_point = process_gpx_file(filepath)
             
@@ -430,7 +651,7 @@ def add_route():
                 flash(message)
 
         except Exception as e:
-            flash(f"Error processing GPX file: {e}")
+            flash(f"Error processing GPX file: {str(e)}")
             return render_template('add_route.html')
 
         return redirect('/')
@@ -439,8 +660,35 @@ def add_route():
 
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
-    """Serve uploaded files."""
-    return send_from_directory(UPLOAD_FOLDER, filename)
+    """Serve uploaded files with appropriate caching headers."""
+    response = make_response(send_from_directory(UPLOAD_FOLDER, filename))
+    
+    # Set caching headers based on file type
+    if filename.endswith(('.webp', '.png', '.jpg', '.jpeg')):
+        # Cache images for 7 days
+        response.headers['Cache-Control'] = 'public, max-age=604800'
+    elif filename.endswith('.gpx'):
+        # Cache GPX files for 1 day
+        response.headers['Cache-Control'] = 'public, max-age=86400'
+    else:
+        # Default cache for 1 hour
+        response.headers['Cache-Control'] = 'public, max-age=3600'
+    
+    return response
+
+@app.after_request
+def add_security_headers(response):
+    """Add security and caching headers to all responses."""
+    # Security headers
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    
+    # Cache static assets
+    if request.endpoint == 'static':
+        response.headers['Cache-Control'] = 'public, max-age=31536000'  # 1 year
+    
+    return response
 
 @app.errorhandler(RequestEntityTooLarge)
 def handle_file_too_large(e):

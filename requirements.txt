@@ -4,3 +4,6 @@ srtm.py
 gunicorn
 Flask-Compress
 staticmap
+Flask-Limiter
+bleach
+html5lib
