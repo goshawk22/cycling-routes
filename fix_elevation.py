@@ -2,6 +2,7 @@ import os
 import sqlite3
 import gpxpy
 import srtm
+from elevation_utils import process_gpx_for_elevation
 
 UPLOAD_FOLDER = 'uploads'
 DB_PATH = 'routes.db'
@@ -24,21 +25,8 @@ def recalculate_elevation_with_srtm():
 
         with open(gpx_path, 'r') as gpx_file:
             gpx = gpxpy.parse(gpx_file)
-            elevation_gain = 0.0
-            # Replace all point elevations with SRTM data
-            for track in gpx.tracks:
-                for segment in track.segments:
-                    for i, point in enumerate(segment.points):
-                        srtm_elev = elevation_data.get_elevation(point.latitude, point.longitude)
-                        if srtm_elev is not None:
-                            point.elevation = srtm_elev
-
-            distance = sum([t.length_3d() for t in gpx.tracks])
-            for track in gpx.tracks:
-                for segment in track.segments:
-                    uphill, _ = segment.get_uphill_downhill()
-                    elevation_gain += uphill
-
+            distance, elevation_gain = process_gpx_for_elevation(gpx, method="best_of_both")
+        
         # Update the route in the database
         c.execute(
             'UPDATE routes SET distance = ?, elevation_gain = ? WHERE id = ?',

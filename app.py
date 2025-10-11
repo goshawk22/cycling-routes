@@ -13,6 +13,7 @@ from flask_limiter.util import get_remote_address
 from werkzeug.exceptions import RequestEntityTooLarge
 from staticmap import StaticMap, Line
 from urllib.parse import urlparse
+from elevation_utils import process_gpx_for_elevation
 
 # Constants
 UPLOAD_FOLDER = 'uploads'
@@ -229,28 +230,13 @@ def calculate_difficulty(distance_km, elevation_gain_m):
             return "Easy"
 
 def process_gpx_file(filepath):
-    """Process GPX file and return route statistics."""
+    """Process GPX file and return route statistics with improved elevation calculation."""
     with open(filepath, 'r') as gpx_file:
         gpx = gpxpy.parse(gpx_file)
 
-        # Replace all point elevations with SRTM data
-        # Common standard for all files so at least it's consistent
-        # Doesn't match up with strava but then everyone seems to calculate it differently (I'm looking at you Komoot)
-        elevation_data = srtm.get_data()
-        elevation_data.add_elevations = True
-        for track in gpx.tracks:
-            for segment in track.segments:
-                for point in segment.points:
-                    srtm_elev = elevation_data.get_elevation(point.latitude, point.longitude)
-                    if srtm_elev is not None:
-                        point.elevation = srtm_elev
-
-        distance = sum([t.length_3d() for t in gpx.tracks])
-        elevation_gain = 0
-        for track in gpx.tracks:
-            for segment in track.segments:
-                uphill, _ = segment.get_uphill_downhill()
-                elevation_gain += uphill
+        # Use improved elevation calculation that matches Strava/Komoot better
+        # This includes smoothing and filtering to reduce GPS noise
+        distance, elevation_gain = process_gpx_for_elevation(gpx, method="distance_smooth_threshold")
 
         # Get first point for location determination
         first_point = None
