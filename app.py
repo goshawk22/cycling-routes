@@ -28,6 +28,7 @@ DEBUG = False  # Set to False in production
 # Coordinates
 CAMPUS = (52.3813, -1.5616)      # University of Warwick
 LEAMINGTON = (52.2922, -1.5354)  # Leamington Spa
+CALPE = (38.6425, 0.0422)        # Calpe, Spain
 
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = MAX_FILE_SIZE  # 5 MB max upload size
@@ -197,14 +198,17 @@ def determine_start_location(first_point):
     
     d_campus = haversine(first_point.latitude, first_point.longitude, *CAMPUS)
     d_leam = haversine(first_point.latitude, first_point.longitude, *LEAMINGTON)
-    min_dist = min(d_campus, d_leam)
+    d_calpe = haversine(first_point.latitude, first_point.longitude, *CALPE)
+    min_dist = min(d_campus, d_leam, d_calpe)
     
     if min_dist > UNKNOWN_LOCATION_THRESHOLD_M:
         return "Other"
-    elif d_campus < d_leam:
+    elif d_campus == min_dist:
         return "Campus"
-    else:
+    elif d_leam == min_dist:
         return "Leamington"
+    else:
+        return "Calpe"
 
 def calculate_difficulty(distance_km, elevation_gain_m):
     """Calculate difficulty rating based on distance and elevation gain.

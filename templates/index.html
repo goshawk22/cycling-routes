@@ -48,25 +48,26 @@
                     class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400" />
                 <select name="start_location" id="start_location"
                     class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <option value="">Any start location</option>
-                    <option value="Campus">Campus</option>
-                    <option value="Leamington">Leamington</option>
-                    <option value="Other">Other</option>
+                    <option value="" {% if request.args.get('start_location', '') == '' %}selected{% endif %}>Any start location</option>
+                    <option value="Campus" {% if request.args.get('start_location', '') == 'Campus' %}selected{% endif %}>Campus</option>
+                    <option value="Leamington" {% if request.args.get('start_location', '') == 'Leamington' %}selected{% endif %}>Leamington</option>
+                    <option value="Calpe" {% if request.args.get('start_location', '') == 'Calpe' %}selected{% endif %}>Calpe</option>
+                    <option value="Other" {% if request.args.get('start_location', '') == 'Other' %}selected{% endif %}>Other</option>
                 </select>
                 <!-- Difficulty filter -->
                 <select name="difficulty" id="difficulty"
                     class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <option value="">Any difficulty</option>
-                    <option value="Easy">Easy</option>
-                    <option value="Moderate">Moderate</option>
-                    <option value="Hard">Hard</option>
-                    <option value="Very Hard">Very Hard</option>
+                    <option value="" {% if request.args.get('difficulty', '') == '' %}selected{% endif %}>Any difficulty</option>
+                    <option value="Easy" {% if request.args.get('difficulty', '') == 'Easy' %}selected{% endif %}>Easy</option>
+                    <option value="Moderate" {% if request.args.get('difficulty', '') == 'Moderate' %}selected{% endif %}>Moderate</option>
+                    <option value="Hard" {% if request.args.get('difficulty', '') == 'Hard' %}selected{% endif %}>Hard</option>
+                    <option value="Very Hard" {% if request.args.get('difficulty', '') == 'Very Hard' %}selected{% endif %}>Very Hard</option>
                 </select>
                 <!-- Offroad filter -->
                 <select name="offroad" id="offroad"
                     class="rounded-md border border-gray-300 px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400">
-                    <option value="0" selected>Road</option>
-                    <option value="1">Offroad</option>
+                    <option value="0" {% if request.args.get('offroad', '0') == '0' %}selected{% endif %}>Road</option>
+                    <option value="1" {% if request.args.get('offroad', '0') == '1' %}selected{% endif %}>Offroad</option>
                 </select>
                 <a href="/" class="inline-block mt-2 text-blue-600 hover:underline text-sm">Reset</a>
             </form>
