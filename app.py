@@ -240,7 +240,7 @@ def process_gpx_file(filepath):
 
         # Use improved elevation calculation that matches Strava/Komoot better
         # This includes smoothing and filtering to reduce GPS noise
-        distance, elevation_gain = process_gpx_for_elevation(gpx, method="distance_smooth_threshold")
+        distance, elevation_gain = process_gpx_for_elevation(gpx, method="leaflet_elevation")
 
         # Get first point for location determination
         first_point = None

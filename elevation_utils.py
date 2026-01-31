@@ -135,6 +135,32 @@ def calculate_elevation_gain(points, distance, method = "distance_smooth_thresho
     else:
         raise ValueError(f"Unknown method: {method}")
 
+def calculate_leaflet_elevation_ascent(elevations):
+    """
+    Calculate total ascent using the exact leaflet-elevation algorithm.
+    For each point, if elevation increases from previous point, add the difference to ascent.
+    
+    Algorithm from leaflet-elevation:
+        let dz = elevation[i] - elevation[i-1];
+        if (dz > 0) ascent += dz;
+    
+    Args:
+        elevations: List of elevation values
+    
+    Returns:
+        Total ascent in meters
+    """
+    if len(elevations) < 2:
+        return 0.0
+    
+    total_ascent = 0.0
+    for i in range(1, len(elevations)):
+        dz = elevations[i] - elevations[i - 1]
+        if dz > 0:
+            total_ascent += dz
+    
+    return total_ascent
+
 def _calculate_gain_with_threshold(elevations, threshold):
     """
     Calculate elevation gain with a minimum threshold to filter out noise.
@@ -164,32 +190,52 @@ def _calculate_gain_with_threshold(elevations, threshold):
     
     return max(0.0, total_gain)
 
-def process_gpx_for_elevation(gpx, method = "distance_smooth_threshold"):
+def process_gpx_for_elevation(gpx, method = "leaflet_elevation"):
     """
-    Process a GPX object to calculate distance and improved elevation gain.
+    Process a GPX object to calculate distance and elevation gain.
+    
+    Args:
+        gpx: GPX object to process
+        method: Calculation method to use:
+            - "leaflet_elevation": Uses leaflet-elevation algorithm (default) - sums positive elevation differences on raw GPX data
+            - "distance_smooth_threshold": Distance-based smoothing + threshold
+            - "moving_average_threshold": Moving average + threshold
+            - "best_of_both": Uses moving average for flat routes, distance-based for hilly routes
+    
+    Returns:
+        Tuple of (distance in meters, elevation_gain in meters)
     """
-    import srtm
-    
-    # Get SRTM elevation data
-    elevation_data = srtm.get_data()
-    elevation_data.add_elevations = True
-    
-    # Extract all points with SRTM elevations
+    # Extract all points from GPX (use original elevations, not SRTM)
     all_points = []
+    elevations = []
     
     for track in gpx.tracks:
         for segment in track.segments:
             for point in segment.points:
-                # Get SRTM elevation
-                srtm_elev = elevation_data.get_elevation(point.latitude, point.longitude)
-                if srtm_elev is not None:
-                    point.elevation = srtm_elev
-                    all_points.append((point.latitude, point.longitude, srtm_elev))
+                if point.elevation is not None:
+                    all_points.append((point.latitude, point.longitude, point.elevation))
+                    elevations.append(point.elevation)
     
     # Calculate distance using gpxpy's built-in method (it's quite good)
     distance = sum([t.length_3d() for t in gpx.tracks])
     
-    # Calculate elevation gain
-    elevation_gain = calculate_elevation_gain(all_points, distance, method=method)
+    # Calculate elevation gain based on selected method
+    if method == "leaflet_elevation":
+        # Exact leaflet-elevation algorithm: sum all positive elevation differences on raw GPX data
+        elevation_gain = calculate_leaflet_elevation_ascent(elevations)
+    else:
+        # Use old threshold-based methods with SRTM data
+        import srtm
+        elevation_data = srtm.get_data()
+        elevation_data.add_elevations = True
+        
+        srtm_points = []
+        for point in all_points:
+            lat, lon = point[0], point[1]
+            srtm_elev = elevation_data.get_elevation(lat, lon)
+            if srtm_elev is not None:
+                srtm_points.append((lat, lon, srtm_elev))
+        
+        elevation_gain = calculate_elevation_gain(srtm_points, distance, method=method)
 
     return distance, elevation_gain

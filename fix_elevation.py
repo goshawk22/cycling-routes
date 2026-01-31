@@ -25,7 +25,7 @@ def recalculate_elevation_with_srtm():
 
         with open(gpx_path, 'r') as gpx_file:
             gpx = gpxpy.parse(gpx_file)
-            distance, elevation_gain = process_gpx_for_elevation(gpx, method="best_of_both")
+            distance, elevation_gain = process_gpx_for_elevation(gpx)
         
         # Update the route in the database
         c.execute(
